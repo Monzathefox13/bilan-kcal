@@ -1,6 +1,6 @@
 // Bilan Calorique — fonctionnement hors ligne
 // Change VERSION à chaque mise à jour des fichiers pour forcer le rafraîchissement.
-const VERSION = 'bilan-kcal-v1.0';
+const VERSION = 'bilan-kcal-v1.1';
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
 
 self.addEventListener('install', e => {

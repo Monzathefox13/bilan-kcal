@@ -156,11 +156,6 @@ nav.tabs button[aria-selected="true"] svg{color:var(--intake)}
     <form class="card" id="dayForm" autocomplete="off">
       <div class="src"><span class="dot" style="background:var(--intake)"></span><h2>Foodvisor · apports</h2></div>
       <div class="field"><label for="intake">Calories consommées (kcal)</label><input id="intake" inputmode="numeric" placeholder="ex. 2450"></div>
-      <div class="g3">
-        <div class="field"><label for="prot">Protéines g</label><input id="prot" inputmode="numeric" placeholder="—"></div>
-        <div class="field"><label for="carb">Glucides g</label><input id="carb" inputmode="numeric" placeholder="—"></div>
-        <div class="field"><label for="fat">Lipides g</label><input id="fat" inputmode="numeric" placeholder="—"></div>
-      </div>
       <div class="src" style="margin-top:6px"><span class="dot" style="background:var(--burn)"></span><h2>Garmin · dépense</h2></div>
       <div class="g2">
         <div class="field"><label for="active">Calories actives</label><input id="active" inputmode="numeric" placeholder="ex. 850"></div>
@@ -189,7 +184,7 @@ nav.tabs button[aria-selected="true"] svg{color:var(--intake)}
         <div class="stat"><b id="wAvgIn" class="c-in">—</b><small>Apports moy.</small></div>
         <div class="stat"><b id="wAvgOut" class="c-burn">—</b><small>Dépense moy.</small></div>
         <div class="stat"><b id="wDays">—</b><small>Jours saisis</small></div>
-        <div class="stat"><b id="wProt">—</b><small>Protéines moy.</small></div>
+        <div class="stat"><b id="wSteps">—</b><small>Pas moy.</small></div>
         <div class="stat"><b id="wWeight" class="c-w">—</b><small id="wWeightLab">Poids moy.</small></div>
       </div>
       <p class="hint" id="wHint"></p>
@@ -276,7 +271,7 @@ nav.tabs button[aria-selected="true"] svg{color:var(--intake)}
       <input type="file" id="importFile" accept=".json,application/json" hidden>
       <p class="hint">Les données restent sur cet iPhone. Fais une sauvegarde chaque semaine vers Fichiers › iCloud Drive : elle permet de tout récupérer en cas de perte ou de changement de téléphone.</p>
     </div>
-    <p class="hint" style="text-align:center">Bilan Calorique · v1.0</p>
+    <p class="hint" style="text-align:center">Bilan Calorique · v1.1</p>
   </section>
 </div>
 
@@ -341,13 +336,13 @@ function calc(d){
   const bmr = d.bmr ?? bmrFrom(settings);
   const out = (bmr||0) + (d.active||0);
   const bal = (d.intake!=null && bmr) ? d.intake - out : null;
-  return {intake:d.intake, bmr, active:d.active, out, bal, protein:d.protein, weight:d.weight};
+  return {intake:d.intake, bmr, active:d.active, out, bal, steps:d.steps, weight:d.weight};
 }
 function summarize(keys){
   const rows = keys.map(k=>calc(days[k])).filter(c=>c && c.bal!=null);
   const avg = f => { const v=rows.map(f).filter(x=>x!=null); return v.length ? v.reduce((a,b)=>a+b,0)/v.length : null; };
   const ws = keys.map(k=>days[k]&&days[k].weight).filter(x=>x>0);
-  return { n:rows.length, total:rows.reduce((s,r)=>s+r.bal,0), avgBal:avg(r=>r.bal), avgIn:avg(r=>r.intake), avgOut:avg(r=>r.out), avgProt:avg(r=>r.protein),
+  return { n:rows.length, total:rows.reduce((s,r)=>s+r.bal,0), avgBal:avg(r=>r.bal), avgIn:avg(r=>r.intake), avgOut:avg(r=>r.out), avgSteps:avg(r=>r.steps),
     avgW: ws.length ? ws.reduce((a,b)=>a+b,0)/ws.length : null };
 }
 const goal = () => +(settings && settings.goal != null ? settings.goal : -300);
@@ -392,7 +387,7 @@ function renderDay(){
   if(needBackup) $('backupMsg').textContent = since==null ? 'Tu n\'as encore jamais sauvegardé tes '+n+' journées.' : 'Dernière sauvegarde il y a '+since+' jours.';
   const d = days[cur] || {};
   if(!document.activeElement || !document.activeElement.closest('#dayForm')){
-    $('intake').value = d.intake ?? ''; $('prot').value = d.protein ?? ''; $('carb').value = d.carbs ?? ''; $('fat').value = d.fat ?? '';
+    $('intake').value = d.intake ?? '';
     $('active').value = d.active ?? ''; $('steps').value = d.steps ?? ''; $('weightDay').value = d.weight!=null ? kg1(d.weight) : '';
   }
   renderBalance();
@@ -437,7 +432,7 @@ function renderWeek(){
   $('wAvgIn').textContent = fmt(s.avgIn); $('wAvgOut').textContent = fmt(s.avgOut);
   const elapsed = keys.filter(k=>k<=t).length;
   $('wDays').textContent = s.n + ' / ' + (elapsed||7);
-  $('wProt').textContent = s.avgProt!=null ? fmt(s.avgProt)+' g' : '—';
+  $('wSteps').textContent = fmt(s.avgSteps);
   const prev = summarize([...Array(7)].map((_,i)=>addDays(wk,i-7)));
   $('wWeight').textContent = s.avgW!=null ? kg1(s.avgW) : '—';
   $('wWeightLab').textContent = (s.avgW!=null && prev.avgW!=null) ? 'Poids moy. ('+(s.avgW-prev.avgW>=0?'+':'−')+kg1(Math.abs(s.avgW-prev.avgW))+')' : 'Poids moy.';
@@ -542,9 +537,9 @@ document.querySelectorAll('[data-range]').forEach(b=>b.onclick=()=>{ range=+b.da
 
 $('dayForm').addEventListener('submit', async e=>{
   e.preventDefault();
-  const rec = { date:cur, intake:num($('intake').value), protein:num($('prot').value), carbs:num($('carb').value), fat:num($('fat').value),
+  const rec = { date:cur, intake:num($('intake').value),
     active:num($('active').value), steps:num($('steps').value), weight:num($('weightDay').value) };
-  if(['intake','active','weight','protein','steps'].every(k=>rec[k]==null)){
+  if(['intake','active','weight','steps'].every(k=>rec[k]==null)){
     if(days[cur] && await ask('Tous les champs sont vides. Supprimer la journée du '+shortDate(cur)+' ?')){ await DB.delDay(cur); delete days[cur]; render(); toast('Journée supprimée'); }
     else if(!days[cur]) toast('Saisis au moins les apports ou les calories actives');
     return;
@@ -586,10 +581,10 @@ async function backup(){
   }
 }
 async function csv(){
-  const head = ['date','apports_kcal','proteines_g','glucides_g','lipides_g','metab_base_kcal','actives_kcal','depense_totale_kcal','bilan_kcal','pas','poids_kg'];
+  const head = ['date','apports_kcal','metab_base_kcal','actives_kcal','depense_totale_kcal','bilan_kcal','pas','poids_kg'];
   const lines = [head.join(';')];
   Object.keys(days).sort().forEach(k=>{ const d=days[k], c=calc(d);
-    const v = [k,d.intake,d.protein,d.carbs,d.fat,c.bmr&&Math.round(c.bmr),d.active,c.out&&Math.round(c.out),c.bal!=null?Math.round(c.bal):null,d.steps,d.weight];
+    const v = [k,d.intake,c.bmr&&Math.round(c.bmr),d.active,c.out&&Math.round(c.out),c.bal!=null?Math.round(c.bal):null,d.steps,d.weight];
     lines.push(v.map(x=>x==null?'':String(x).replace('.',',')).join(';')); });
   await shareFile('bilan-kcal-'+today()+'.csv', '﻿'+lines.join('\n'), 'text/csv');
 }
